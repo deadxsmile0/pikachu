@@ -333,6 +333,12 @@ public class MyHelperScript {
         }
     }
 
+    public static void ChangeLineRenderStartAndEndPoint(LineRenderer _lineRenderer, Vector3 _startPoint, Vector3 _endPoint) {
+        _lineRenderer.positionCount = 2;
+        _lineRenderer.SetPosition(0, _startPoint);
+        _lineRenderer.SetPosition(1, _endPoint);
+    }
+
     /// <summary>
     /// BFS path finding, holy fuck my head
     /// </summary>
@@ -436,7 +442,7 @@ public class MyHelperScript {
                                 InfiControl2++;
                             } while (true && InfiControl2 <= maxMove);
                         } catch (System.Exception ex) {
-                            UnityEngine.Debug.Log(ex.ToString());
+                            //UnityEngine.Debug.Log(ex.ToString());
                         }
                         break;
                     } else {

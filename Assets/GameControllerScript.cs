@@ -47,6 +47,8 @@ public class GameControllerScript : MonoBehaviour {
     public Thread vBFSThread;
     private object vThreadLock = new object();
 
+    public float ScanSpeed;
+
 
 
 
@@ -54,12 +56,14 @@ public class GameControllerScript : MonoBehaviour {
 
 
     void Start() {
+        Application.targetFrameRate = 1000;
+        QualitySettings.vSyncCount = 0;
         vHpler.PoolInit("Pokemon", vPKMGridSize.x * vPKMGridSize.y, vPokemonObjectOriginal, vPoolHolder);
         vCam = gameObject.GetComponent<Camera>();
         vLRender = gameObject.GetComponent<LineRenderer>();
         vAuController.PlayAudio("rocksolid");
 
-        InitPkmGrid();
+        StartCoroutine(InitPkmGrid());
 
         vOldComboTime = vComboTime;
         vLvIndicator.text = "LV" + vLV;
@@ -68,11 +72,15 @@ public class GameControllerScript : MonoBehaviour {
     void Update() {
         if (Input.GetKeyDown(KeyCode.F)) {
             //StartCoroutine(SpawnPokemonObjectWithDelay());
-            InitPkmGrid();
+            StartCoroutine(InitPkmGrid());
         }
         if (Input.GetKeyDown(KeyCode.B)) {
             print(vPokemonGrid[vGameObjectPosDebug.x, vGameObjectPosDebug.y].gameObject.name);
             print(vPokemonGrid[vGameObjectPosDebug.x, vGameObjectPosDebug.y].vPokemon.PokemonPosInGrid);
+        }
+        if (Input.GetKeyDown(KeyCode.S)) {
+            StartCoroutine(AutoSolving());
+            //AutoSolving();
         }
 
 
@@ -81,7 +89,7 @@ public class GameControllerScript : MonoBehaviour {
                 vHit2d = Physics2D.Raycast(vCam.ScreenToWorldPoint(Input.mousePosition), Vector3.forward, 999f);
                 if (vHit2d) {
                     if (vHit2d.transform.gameObject.name.CompareTo("Shuffle") == 0) {
-                        InitPkmGrid();
+                        StartCoroutine(InitPkmGrid());
                         vTimeBarScpt.TimeBarPenalty();
                         vRayCastHitGameObjectFirst = null;
                     } else if (vHit2d.transform.gameObject.name.CompareTo("ToggleWindows") == 0) {
@@ -107,7 +115,7 @@ public class GameControllerScript : MonoBehaviour {
                         }
                         if (vRayCastHitGameObjectFirst != null && vRayCastHitGameObjectSecond != null) {
                             if (vRayCastHitGameObjectFirst.name.CompareTo(vRayCastHitGameObjectSecond.name) != 0) {
-                                CanPokemonBeConnectedInThreeLine(vRayCastHitGameObjectFirst, vRayCastHitGameObjectSecond);
+                                CanPokemonBeConnectedInThreeLine(vRayCastHitGameObjectFirst, vRayCastHitGameObjectSecond, true);
                                 PokemonInfo(vRayCastHitGameObjectFirst).ChangeBackgroundColor(new Color(1f, 1f, 1f, 1));
                                 PokemonInfo(vRayCastHitGameObjectSecond).ChangeBackgroundColor(new Color(1f, 1f, 1f, 1));
                                 vRayCastHitGameObjectFirst = null;
@@ -132,9 +140,11 @@ public class GameControllerScript : MonoBehaviour {
                 vPkmBonk.sprite = vRayCastHitGameObjectFirst.GetComponent<SpriteRenderer>().sprite;
             }
         }
+
+        ResolvedConnectingTwoPokemon();
     }
 
-    private void FixedUpdate() {
+    void ResolvedConnectingTwoPokemon() {
         if (vDoneBFS) {
             if (vNumberOfTurn != 0 && vNumberOfTurn <= 3) {
                 PointCalculator();
@@ -148,7 +158,7 @@ public class GameControllerScript : MonoBehaviour {
                     vTimeBarScpt.ResetTimeBar();
                     vLV++;
                     vLvIndicator.text = "LV" + vLV;
-                    InitPkmGrid();
+                    StartCoroutine(InitPkmGrid());
                 }
                 vNumberOfTurn = 0;
             }
@@ -168,97 +178,112 @@ public class GameControllerScript : MonoBehaviour {
         }
     }
 
-    void CanPokemonBeConnectedInThreeLine(GameObject _pokemonFirst, GameObject _pokemonSecond) {
+    bool CanPokemonBeConnectedInThreeLine(GameObject _pokemonFirst, GameObject _pokemonSecond, bool _useThreading) {
         PokemonObjectScript pkmScpt1, pkmScpt2;
         pkmScpt1 = _pokemonFirst.GetComponent<PokemonObjectScript>();
         pkmScpt2 = _pokemonSecond.GetComponent<PokemonObjectScript>();
         Vector2Int arCord1, arCord2;
         arCord1 = pkmScpt1.vPokemon.PokemonCoordInArray;
         arCord2 = pkmScpt2.vPokemon.PokemonCoordInArray;
-        if (vPokemonGrid[arCord1.x, arCord1.y].ActiveStatus() && vPokemonGrid[arCord2.x, arCord2.y].ActiveStatus()) {
-            if (pkmScpt1.vPokemon.PokemonName.CompareTo(pkmScpt2.vPokemon.PokemonName) == 0) {
-                if (arCord1.y == vPKMGridSize.y - 1 && arCord1.y == arCord2.y) {
-                    if (pkmScpt1.vPokemon.PokemonName.CompareTo(pkmScpt2.vPokemon.PokemonName) == 0) {
-                        vPokemonGrid[arCord1.x, arCord1.y].HidePokemon();
-                        vPokemonGrid[arCord2.x, arCord2.y].HidePokemon();
-                        vAuController.PlayAudio("bonk");
-                        GameObject.FindWithTag("Bonk").GetComponent<Animator>().Play("Bonked");
-                        PointCalculator();
-                        vTimeBarScpt.BonusTime();
-                        if (CheckingGridCompletedStatus()) {
-                            vTimeBarScpt.ResetTimeBar();
-                            vLV++;
-                            vLvIndicator.text = "LV" + vLV;
-                            InitPkmGrid();
+        if (_pokemonFirst.name.CompareTo(_pokemonSecond.name) != 0) {
+            if (vPokemonGrid[arCord1.x, arCord1.y].ActiveStatus() && vPokemonGrid[arCord2.x, arCord2.y].ActiveStatus()) {
+                if (pkmScpt1.vPokemon.PokemonName.CompareTo(pkmScpt2.vPokemon.PokemonName) == 0) {
+                    if (arCord1.y == vPKMGridSize.y - 1 && arCord1.y == arCord2.y) {
+                        if (pkmScpt1.vPokemon.PokemonName.CompareTo(pkmScpt2.vPokemon.PokemonName) == 0) {
+                            vPokemonGrid[arCord1.x, arCord1.y].HidePokemon();
+                            vPokemonGrid[arCord2.x, arCord2.y].HidePokemon();
+                            vAuController.PlayAudio("bonk");
+                            GameObject.FindWithTag("Bonk").GetComponent<Animator>().Play("Bonked");
+                            PointCalculator();
+                            vTimeBarScpt.BonusTime();
+                            if (CheckingGridCompletedStatus()) {
+                                vTimeBarScpt.ResetTimeBar();
+                                vLV++;
+                                vLvIndicator.text = "LV" + vLV;
+                                StartCoroutine(InitPkmGrid());
+                            }
+                            return true;
+                            // _pokemonFirst.SetActive(false);
+                            // _pokemonSecond.SetActive(false);
                         }
-                        // _pokemonFirst.SetActive(false);
-                        // _pokemonSecond.SetActive(false);
-                    }
-                } else if (arCord1.y == 0 && arCord1.y == arCord2.y) {
-                    if (pkmScpt1.vPokemon.PokemonName.CompareTo(pkmScpt2.vPokemon.PokemonName) == 0) {
-                        vPokemonGrid[arCord1.x, arCord1.y].HidePokemon();
-                        vPokemonGrid[arCord2.x, arCord2.y].HidePokemon();
-                        vAuController.PlayAudio("bonk");
-                        GameObject.FindWithTag("Bonk").GetComponent<Animator>().Play("Bonked");
-                        PointCalculator();
-                        vTimeBarScpt.BonusTime();
-                        if (CheckingGridCompletedStatus()) {
-                            vTimeBarScpt.ResetTimeBar();
-                            vLV++;
-                            vLvIndicator.text = "LV" + vLV;
-                            InitPkmGrid();
+                    } else if (arCord1.y == 0 && arCord1.y == arCord2.y) {
+                        if (pkmScpt1.vPokemon.PokemonName.CompareTo(pkmScpt2.vPokemon.PokemonName) == 0) {
+                            vPokemonGrid[arCord1.x, arCord1.y].HidePokemon();
+                            vPokemonGrid[arCord2.x, arCord2.y].HidePokemon();
+                            vAuController.PlayAudio("bonk");
+                            GameObject.FindWithTag("Bonk").GetComponent<Animator>().Play("Bonked");
+                            PointCalculator();
+                            vTimeBarScpt.BonusTime();
+                            if (CheckingGridCompletedStatus()) {
+                                vTimeBarScpt.ResetTimeBar();
+                                vLV++;
+                                vLvIndicator.text = "LV" + vLV;
+                                StartCoroutine(InitPkmGrid());
+                            }
+                            return true;
+                            // _pokemonFirst.SetActive(false);
+                            // _pokemonSecond.SetActive(false);
                         }
-                        // _pokemonFirst.SetActive(false);
-                        // _pokemonSecond.SetActive(false);
                     }
-                }
-                if (arCord1.x == vPKMGridSize.x - 1 && arCord1.x == arCord2.x) {
-                    if (pkmScpt1.vPokemon.PokemonName.CompareTo(pkmScpt2.vPokemon.PokemonName) == 0) {
-                        vPokemonGrid[arCord1.x, arCord1.y].HidePokemon();
-                        vPokemonGrid[arCord2.x, arCord2.y].HidePokemon();
-                        vAuController.PlayAudio("bonk");
-                        GameObject.FindWithTag("Bonk").GetComponent<Animator>().Play("Bonked");
-                        PointCalculator();
-                        vTimeBarScpt.BonusTime();
-                        if (CheckingGridCompletedStatus()) {
-                            vTimeBarScpt.ResetTimeBar();
-                            vLV++;
-                            vLvIndicator.text = "LV" + vLV;
-                            InitPkmGrid();
+                    if (arCord1.x == vPKMGridSize.x - 1 && arCord1.x == arCord2.x) {
+                        if (pkmScpt1.vPokemon.PokemonName.CompareTo(pkmScpt2.vPokemon.PokemonName) == 0) {
+                            vPokemonGrid[arCord1.x, arCord1.y].HidePokemon();
+                            vPokemonGrid[arCord2.x, arCord2.y].HidePokemon();
+                            vAuController.PlayAudio("bonk");
+                            GameObject.FindWithTag("Bonk").GetComponent<Animator>().Play("Bonked");
+                            PointCalculator();
+                            vTimeBarScpt.BonusTime();
+                            if (CheckingGridCompletedStatus()) {
+                                vTimeBarScpt.ResetTimeBar();
+                                vLV++;
+                                vLvIndicator.text = "LV" + vLV;
+                                StartCoroutine(InitPkmGrid());
+                            }
+                            return true;
+                            // _pokemonFirst.SetActive(false);
+                            // _pokemonSecond.SetActive(false);
                         }
-                        // _pokemonFirst.SetActive(false);
-                        // _pokemonSecond.SetActive(false);
-                    }
-                } else if (arCord1.x == 0 && arCord1.x == arCord2.x) {
-                    if (pkmScpt1.vPokemon.PokemonName.CompareTo(pkmScpt2.vPokemon.PokemonName) == 0) {
-                        vPokemonGrid[arCord1.x, arCord1.y].HidePokemon();
-                        vPokemonGrid[arCord2.x, arCord2.y].HidePokemon();
-                        vAuController.PlayAudio("bonk");
-                        GameObject.FindWithTag("Bonk").GetComponent<Animator>().Play("Bonked");
-                        PointCalculator();
-                        vTimeBarScpt.BonusTime();
-                        if (CheckingGridCompletedStatus()) {
-                            vTimeBarScpt.ResetTimeBar();
-                            vLV++;
-                            vLvIndicator.text = "LV" + vLV;
-                            InitPkmGrid();
+                    } else if (arCord1.x == 0 && arCord1.x == arCord2.x) {
+                        if (pkmScpt1.vPokemon.PokemonName.CompareTo(pkmScpt2.vPokemon.PokemonName) == 0) {
+                            vPokemonGrid[arCord1.x, arCord1.y].HidePokemon();
+                            vPokemonGrid[arCord2.x, arCord2.y].HidePokemon();
+                            vAuController.PlayAudio("bonk");
+                            GameObject.FindWithTag("Bonk").GetComponent<Animator>().Play("Bonked");
+                            PointCalculator();
+                            vTimeBarScpt.BonusTime();
+                            if (CheckingGridCompletedStatus()) {
+                                vTimeBarScpt.ResetTimeBar();
+                                vLV++;
+                                vLvIndicator.text = "LV" + vLV;
+                                StartCoroutine(InitPkmGrid());
+                            }
+                            return true;
+                            // _pokemonFirst.SetActive(false);
+                            // _pokemonSecond.SetActive(false);
                         }
-                        // _pokemonFirst.SetActive(false);
-                        // _pokemonSecond.SetActive(false);
                     }
-                }
 
 
 
 
-                if (vPokemonGrid[arCord1.x, arCord1.y].ActiveStatus() && vPokemonGrid[arCord2.x, arCord2.y].ActiveStatus()) {
-                    GetPathBetweenPokemon(
-                        vPokemonGrid[arCord1.x, arCord1.y].transform.gameObject,
-                        vPokemonGrid[arCord2.x, arCord2.y].transform.gameObject
-                    );
+                    if (vPokemonGrid[arCord1.x, arCord1.y].ActiveStatus() && vPokemonGrid[arCord2.x, arCord2.y].ActiveStatus()) {
+                        if (_useThreading) {
+                            GetPathBetweenPokemon(
+                                vPokemonGrid[arCord1.x, arCord1.y].transform.gameObject,
+                                vPokemonGrid[arCord2.x, arCord2.y].transform.gameObject
+                            );
+                        } else {
+                            if (GetPathBetweenPokemonNoThreading(vPokemonGrid[arCord1.x, arCord1.y].transform.gameObject, vPokemonGrid[arCord2.x, arCord2.y].transform.gameObject)) {
+                                return true;
+                            } else {
+                                return false;
+                            }
+                        }
+                    }
                 }
             }
         }
+        return false;
     }
     private void HidePokemonInGrid(Vector2Int _pkmPos1, Vector2Int _pkmPos2) {
         vPokemonGrid[_pkmPos1.x, _pkmPos1.y].HidePokemon();
@@ -391,8 +416,8 @@ public class GameControllerScript : MonoBehaviour {
     }
 
     public bool CheckingGridCompletedStatus() {
-        for (int a = 0; a < vPokemonGrid.GetLength(0); a++) {
-            for (int b = 0; b < vPokemonGrid.GetLength(1); b++) {
+        for (int a = 0; a < vPokemonGrid.GetLength(1); a++) {
+            for (int b = 0; b < vPokemonGrid.GetLength(0); b++) {
                 if (vPokemonGrid[b, a].ActiveStatus()) {
                     return false;
                 }
@@ -401,10 +426,52 @@ public class GameControllerScript : MonoBehaviour {
         return true;
     }
 
-    public void InitPkmGrid() {
+    public IEnumerator InitPkmGrid() {
+        yield return new WaitForSecondsRealtime(1f);
         SpawnPokemonObject();
         vTimeBarScpt.vHolder.transform.localScale = Vector3.one;
         vTimeBarScpt.vRunAllow = true;
+    }
+
+    public IEnumerator AutoSolving() {
+        LineRenderer lineRen = GameObject.Find("LineRendererDebug").GetComponent<LineRenderer>();
+        bool[,] maze = ConvertPokemonGridToBoolGrid();
+        MyHelperScript.BFS bfs = new MyHelperScript.BFS();
+        vDoneBFS = false;
+        bool abort = false;
+        do {
+            if (CheckingGridCompletedStatus()) {
+                abort = true;
+                MyHelperScript.ChangeLineRenderStartAndEndPoint(
+                    lineRen,
+                    Vector3.zero,
+                    Vector3.zero
+                );
+            }
+            for (int a = 0; a < vPokemonGrid.GetLength(1); a++) {
+                for (int b = 0; b < vPokemonGrid.GetLength(0); b++) {
+                    if (vPokemonGrid[b, a].ActiveStatus()) {
+                        for (int c = 0; c < vPokemonGrid.GetLength(1); c++) {
+                            for (int d = 0; d < vPokemonGrid.GetLength(0); d++) {
+                                yield return new WaitForSecondsRealtime(ScanSpeed);
+                                if (vPokemonGrid[d, c].ActiveStatus() && vPokemonGrid[b, a].ActiveStatus()) {
+                                    MyHelperScript.ChangeLineRenderStartAndEndPoint(
+                                        lineRen,
+                                        vPokemonGrid[b, a].gameObject.transform.localPosition,
+                                        vPokemonGrid[d, c].gameObject.transform.localPosition
+                                    );
+                                    //Debug.Log(vPokemonGrid[d, c].gameObject.name + " [-] " + vPokemonGrid[b, a].gameObject.name);
+                                    if (CanPokemonBeConnectedInThreeLine(vPokemonGrid[b, a].gameObject, vPokemonGrid[d, c].gameObject, false)) {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
+        } while (!abort);
     }
 
     public void GetPathBetweenPokemon(GameObject _pkmFirst, GameObject _pkmSecond) {
@@ -428,6 +495,26 @@ public class GameControllerScript : MonoBehaviour {
                 print("Thread Done.");
             });
             vBFSThread.Start();
+        }
+    }
+
+    public bool GetPathBetweenPokemonNoThreading(GameObject _pkmFirst, GameObject _pkmSecond) {
+        bool[,] maze = ConvertPokemonGridToBoolGrid();
+        MyHelperScript.BFS bfs = new MyHelperScript.BFS();
+        bfs.SettingUp(
+            maze,
+            _pkmFirst.GetComponent<PokemonObjectScript>().vPokemon.PokemonCoordInArray,
+            _pkmSecond.GetComponent<PokemonObjectScript>().vPokemon.PokemonCoordInArray,
+            vPokemonGrid
+        );
+        vDoneBFS = false;
+        pathDemo = bfs.GetTheShortestPath(vDebugBFS);
+        vDoneBFS = true;
+        vNumberOfTurn = bfs.CalculateAmountOfTurningPoint(pathDemo);
+        if (vNumberOfTurn <= 3) {
+            return true;
+        } else {
+            return false;
         }
     }
 
