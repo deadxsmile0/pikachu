@@ -1082,7 +1082,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   vCam: {fileID: 0}
-  vPKMGridSize: {x: 6, y: 6}
+  vPKMGridSize: {x: 16, y: 10}
   vPokemonSprites:
   - {fileID: 8893786113882650503, guid: 298e61b7d26ed264f9a0b6644c9280d4, type: 3}
   - {fileID: 4699086607729491551, guid: 298e61b7d26ed264f9a0b6644c9280d4, type: 3}
