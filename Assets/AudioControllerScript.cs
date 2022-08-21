@@ -21,14 +21,15 @@ public class AudioControllerScript : MonoBehaviour {
         }
     }
 
-    public void PlayAudio(string _clipName) {
+    public AudioSource PlayAudio(string _clipName) {
         for (int a = 0; a < vAuSrc.Count; a++) {
             if (!vAuSrc[a].isPlaying) {
                 vAuSrc[a].clip = LoadAudio(_clipName);
                 vAuSrc[a].Play();
-                break;
+                return vAuSrc[a];
             }
         }
+        return null;
     }
 
     public AudioClip LoadAudio(string _clipName) {

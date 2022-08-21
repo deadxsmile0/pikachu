@@ -61,7 +61,7 @@ public class GameControllerScript : MonoBehaviour {
         vHpler.PoolInit("Pokemon", vPKMGridSize.x * vPKMGridSize.y, vPokemonObjectOriginal, vPoolHolder);
         vCam = gameObject.GetComponent<Camera>();
         vLRender = gameObject.GetComponent<LineRenderer>();
-        vAuController.PlayAudio("rocksolid");
+        vAuController.PlayAudio("rocksolid").loop = true;
 
         StartCoroutine(InitPkmGrid());
 
@@ -93,6 +93,12 @@ public class GameControllerScript : MonoBehaviour {
                         vTimeBarScpt.TimeBarPenalty();
                         vRayCastHitGameObjectFirst = null;
                     } else if (vHit2d.transform.gameObject.name.CompareTo("ToggleWindows") == 0) {
+                        if (Screen.fullScreen) {
+                            Screen.fullScreen = false;
+                        } else {
+                            Screen.fullScreen = true;
+                        }
+                    } else if (vHit2d.transform.gameObject.name.CompareTo("Help") == 0) {
                         if (Screen.fullScreen) {
                             Screen.fullScreen = false;
                         } else {
@@ -453,16 +459,21 @@ public class GameControllerScript : MonoBehaviour {
                     if (vPokemonGrid[b, a].ActiveStatus()) {
                         for (int c = 0; c < vPokemonGrid.GetLength(1); c++) {
                             for (int d = 0; d < vPokemonGrid.GetLength(0); d++) {
-                                yield return new WaitForSecondsRealtime(ScanSpeed);
-                                if (vPokemonGrid[d, c].ActiveStatus() && vPokemonGrid[b, a].ActiveStatus()) {
-                                    MyHelperScript.ChangeLineRenderStartAndEndPoint(
-                                        lineRen,
-                                        vPokemonGrid[b, a].gameObject.transform.localPosition,
-                                        vPokemonGrid[d, c].gameObject.transform.localPosition
-                                    );
-                                    //Debug.Log(vPokemonGrid[d, c].gameObject.name + " [-] " + vPokemonGrid[b, a].gameObject.name);
-                                    if (CanPokemonBeConnectedInThreeLine(vPokemonGrid[b, a].gameObject, vPokemonGrid[d, c].gameObject, false)) {
-                                        break;
+                                if (!vPokemonGrid[b, a].ActiveStatus()) {
+                                    break;
+                                }
+                                if (vPokemonGrid[d, c].vPokemon.PokemonName.CompareTo(vPokemonGrid[b, a].vPokemon.PokemonName) == 0) {
+                                    if (vPokemonGrid[d, c].ActiveStatus()) {
+                                        yield return new WaitForSecondsRealtime(ScanSpeed);
+                                        MyHelperScript.ChangeLineRenderStartAndEndPoint(
+                                            lineRen,
+                                            vPokemonGrid[b, a].gameObject.transform.localPosition,
+                                            vPokemonGrid[d, c].gameObject.transform.localPosition
+                                        );
+                                        //Debug.Log(vPokemonGrid[d, c].gameObject.name + " [-] " + vPokemonGrid[b, a].gameObject.name);
+                                        if (CanPokemonBeConnectedInThreeLine(vPokemonGrid[b, a].gameObject, vPokemonGrid[d, c].gameObject, false)) {
+                                            break;
+                                        }
                                     }
                                 }
                             }

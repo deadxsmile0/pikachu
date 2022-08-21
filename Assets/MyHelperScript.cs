@@ -486,6 +486,23 @@ public class MyHelperScript {
                     }
                 }
             }
+            if (CheckArrayIfInBounds(GridSize, new Vector2Int(_movePos.x, _movePos.y + 1))) {
+                if (!Visited.ContainsKey(new Vector2Int(_movePos.x, _movePos.y + 1))) {
+                    if (Grid[_movePos.x, _movePos.y + 1] != false || checkIfPosIsTheEndPoint(new Vector2Int(_movePos.x, _movePos.y + 1))) {
+                        QueueList.Enqueue(new Vector2Int(_movePos.x, _movePos.y + 1));
+                        if (!BackTrack.ContainsKey(new Vector2Int(_movePos.x, _movePos.y + 1))) {
+                            BackTrack.Add(new Vector2Int(_movePos.x, _movePos.y + 1), _movePos);
+                        }
+                        if (_enableDebug) {
+                            UnityEngine.Debug.Log(_movePos + " Move Up is OK.");
+                        }
+                    } else {
+                        if (_enableDebug) {
+                            UnityEngine.Debug.Log(_movePos + " Have Obstacle above.");
+                        }
+                    }
+                }
+            }
             if (CheckArrayIfInBounds(GridSize, new Vector2Int(_movePos.x - 1, _movePos.y))) {
                 if (!Visited.ContainsKey(new Vector2Int(_movePos.x - 1, _movePos.y))) {
                     if (Grid[_movePos.x - 1, _movePos.y] != false || checkIfPosIsTheEndPoint(new Vector2Int(_movePos.x - 1, _movePos.y))) {
@@ -500,23 +517,6 @@ public class MyHelperScript {
                     } else {
                         if (_enableDebug) {
                             UnityEngine.Debug.Log(_movePos + " Have Obstacle to the left.");
-                        }
-                    }
-                }
-            }
-            if (CheckArrayIfInBounds(GridSize, new Vector2Int(_movePos.x, _movePos.y + 1))) {
-                if (!Visited.ContainsKey(new Vector2Int(_movePos.x, _movePos.y + 1))) {
-                    if (Grid[_movePos.x, _movePos.y + 1] != false || checkIfPosIsTheEndPoint(new Vector2Int(_movePos.x, _movePos.y + 1))) {
-                        QueueList.Enqueue(new Vector2Int(_movePos.x, _movePos.y + 1));
-                        if (!BackTrack.ContainsKey(new Vector2Int(_movePos.x, _movePos.y + 1))) {
-                            BackTrack.Add(new Vector2Int(_movePos.x, _movePos.y + 1), _movePos);
-                        }
-                        if (_enableDebug) {
-                            UnityEngine.Debug.Log(_movePos + " Move Up is OK.");
-                        }
-                    } else {
-                        if (_enableDebug) {
-                            UnityEngine.Debug.Log(_movePos + " Have Obstacle above.");
                         }
                     }
                 }
